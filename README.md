@@ -1,4 +1,4 @@
-# @ayali/node-red-jev
+# @ayali/node-red-contrib-jev
 
 Typed, calibrated decisions in Node-RED, backed by TypeSafe's Jev model.
 
@@ -17,20 +17,20 @@ Once published, from **Manage palette → Install**, or:
 
 ```bash
 cd ~/.node-red
-npm install @ayali/node-red-jev
+npm install @ayali/node-red-contrib-jev
 ```
 
 For a Docker install, `/data` is the user directory:
 
 ```bash
-npm pack                                          # → ayali-node-red-jev-0.1.0.tgz
-docker cp ayali-node-red-jev-0.1.0.tgz nodered:/data/
-docker exec -w /data nodered npm install ./ayali-node-red-jev-0.1.0.tgz
+npm pack                                          # → ayali-node-red-contrib-jev-1.0.0.tgz
+docker cp ayali-node-red-contrib-jev-1.0.0.tgz nodered:/data/
+docker exec -w /data nodered npm install ./ayali-node-red-contrib-jev-1.0.0.tgz
 docker restart nodered
 ```
 
 Requires Node.js 18+ (uses the built-in `fetch`) and Node-RED 3.1+.
-Import the flows under **Import → Examples → @ayali/node-red-jev**.
+Import the flows under **Import → Examples → @ayali/node-red-contrib-jev**.
 
 ## Questions
 

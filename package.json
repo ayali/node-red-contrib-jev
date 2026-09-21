@@ -1,6 +1,6 @@
 {
-  "name": "@ayali/node-red-jev",
-  "version": "0.3.2",
+  "name": "@ayali/node-red-contrib-jev",
+  "version": "1.0.0",
   "description": "TypeSafe Jev (System One) typed decisions for Node-RED — evaluate a state and route on the answer",
   "license": "MIT",
   "author": "Ayal Itzkovitz",
@@ -13,6 +13,7 @@
     "url": "https://github.com/ayali/node-red-contrib-jev/issues"
   },
   "keywords": [
+    "node-red",
     "jev",
     "typesafe",
     "classification",
@@ -41,6 +42,5 @@
   },
   "scripts": {
     "test": "node --check jev.js"
-  },
-  "private": true
+  }
 }
