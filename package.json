@@ -1,7 +1,7 @@
 {
   "name": "@ayali/node-red-contrib-jev",
-  "version": "1.0.1",
-  "description": "Typed, calibrated decisions in Node-RED — one answer per question, backed by TypeSafe's Jev model",
+  "version": "1.0.2",
+  "description": "Simple Node RED integration to TypeSafe AI's runtime Jev model",
   "license": "MIT",
   "author": "Ayal Itzkovitz",
   "homepage": "https://github.com/ayali/node-red-contrib-jev#readme",
