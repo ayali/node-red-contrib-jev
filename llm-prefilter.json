@@ -1,0 +1,114 @@
+[
+  {
+    "id": "jevex2tab",
+    "type": "tab",
+    "label": "Jev — LLM prefilter",
+    "disabled": false,
+    "info": "Cascade pattern: Jev answers three questions about every inbound message for a fraction of a cent, and only the minority that need prose reach the expensive model.\n\nSingle-output mode — all three answers arrive together on msg.jev.answers."
+  },
+  {
+    "id": "jevex2cfg",
+    "type": "jev-config",
+    "name": "TypeSafe",
+    "baseUrl": "https://api.typesafe.ai",
+    "model": "jev-latest"
+  },
+  {
+    "id": "jevex2inject",
+    "type": "inject",
+    "z": "jevex2tab",
+    "name": "sample message",
+    "props": [{ "p": "payload" }],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "topic": "",
+    "payload": "Reminder: tomorrow is a short day, pickup at 12:30 instead of 14:00. Please send a note if someone else is collecting.",
+    "payloadType": "str",
+    "x": 160,
+    "y": 120,
+    "wires": [["jevex2jev"]]
+  },
+  {
+    "id": "jevex2jev",
+    "type": "jev",
+    "z": "jevex2tab",
+    "name": "triage",
+    "server": "jevex2cfg",
+    "mode": "single",
+    "state": "payload",
+    "stateType": "msg",
+    "questions": [
+      {
+        "key": "needs_action",
+        "type": "noul",
+        "instructions": "Does this message require a parent to do something?",
+        "trueDesc": "Asks for a reply, a signature, money, an item to bring, or a change to pickup or schedule",
+        "falseDesc": "Social chatter, thanks, photos, or information needing no response"
+      },
+      {
+        "key": "category",
+        "type": "choice",
+        "instructions": "What is this message about?",
+        "options": [
+          { "name": "schedule", "desc": "Times, dates, pickup, cancellations" },
+          { "name": "logistics", "desc": "Items to bring, forms, payments" },
+          { "name": "social", "desc": "Chatter, congratulations, photos" },
+          { "name": "urgent", "desc": "Safety, illness, or something happening today" }
+        ]
+      },
+      {
+        "key": "time_pressure",
+        "type": "score",
+        "instructions": "How soon must this be acted on?",
+        "levels": ["Whenever", "This week", "Today"]
+      }
+    ],
+    "answerProp": "answer",
+    "outputProp": "jev",
+    "timeout": 15000,
+    "retries": 2,
+    "outputs": 1,
+    "x": 350,
+    "y": 120,
+    "wires": [["jevex2switch"]]
+  },
+  {
+    "id": "jevex2switch",
+    "type": "switch",
+    "z": "jevex2tab",
+    "name": "act?",
+    "property": "jev.answers.needs_action.noul",
+    "propertyType": "msg",
+    "rules": [{ "t": "gte", "v": "0.6", "vt": "num" }, { "t": "else" }],
+    "checkall": "false",
+    "outputs": 2,
+    "x": 510,
+    "y": 120,
+    "wires": [["jevex2llm"], ["jevex2drop"]]
+  },
+  {
+    "id": "jevex2llm",
+    "type": "debug",
+    "z": "jevex2tab",
+    "name": "→ LLM summariser",
+    "active": true,
+    "complete": "jev",
+    "targetType": "msg",
+    "x": 710,
+    "y": 90,
+    "wires": []
+  },
+  {
+    "id": "jevex2drop",
+    "type": "debug",
+    "z": "jevex2tab",
+    "name": "→ digest only",
+    "active": true,
+    "complete": "jev",
+    "targetType": "msg",
+    "x": 700,
+    "y": 150,
+    "wires": []
+  }
+]

@@ -1,0 +1,136 @@
+[
+  {
+    "id": "jevex1tab",
+    "type": "tab",
+    "label": "Jev — Frigate triage",
+    "disabled": false,
+    "info": "One output per question. Each branch decides its own threshold in a Switch node, so the decision boundary stays visible on the canvas.\n\nSwap the inject node for your `frigate/events` MQTT in node."
+  },
+  {
+    "id": "jevex1cfg",
+    "type": "jev-config",
+    "name": "TypeSafe",
+    "baseUrl": "https://api.typesafe.ai",
+    "model": "jev-latest"
+  },
+  {
+    "id": "jevex1inject",
+    "type": "inject",
+    "z": "jevex1tab",
+    "name": "sample event",
+    "props": [{ "p": "payload" }],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "topic": "",
+    "payload": "{\"camera\":\"front_gate\",\"label\":\"person\",\"score\":0.81,\"zones\":[\"driveway\"],\"local_time\":\"02:14\",\"stationary\":false,\"recent_similar_events\":0}",
+    "payloadType": "json",
+    "x": 150,
+    "y": 140,
+    "wires": [["jevex1jev"]]
+  },
+  {
+    "id": "jevex1jev",
+    "type": "jev",
+    "z": "jevex1tab",
+    "name": "triage event",
+    "server": "jevex1cfg",
+    "mode": "split",
+    "state": "payload",
+    "stateType": "msg",
+    "questions": [
+      {
+        "key": "notify",
+        "type": "noul",
+        "instructions": "Should this camera event interrupt someone in the house right now?",
+        "trueDesc": "A person or vehicle somewhere or at a time that warrants attention, e.g. an unrecognised person at the gate at night",
+        "falseDesc": "Routine or expected: a known car in the driveway, an animal, foliage or rain, a repeat of an event already seen"
+      },
+      {
+        "key": "subject",
+        "type": "choice",
+        "instructions": "What triggered this event?",
+        "options": [
+          { "name": "person", "desc": "" },
+          { "name": "vehicle", "desc": "" },
+          { "name": "animal", "desc": "" },
+          { "name": "other", "desc": "Foliage, shadows, rain, or an unclear detection" }
+        ]
+      }
+    ],
+    "answerProp": "answer",
+    "outputProp": "jev",
+    "timeout": 15000,
+    "retries": 2,
+    "outputs": 2,
+    "x": 350,
+    "y": 140,
+    "wires": [["jevex1sw"], ["jevex1subject"]]
+  },
+  {
+    "id": "jevex1sw",
+    "type": "switch",
+    "z": "jevex1tab",
+    "name": "p >= 0.8 ?",
+    "property": "answer.noul",
+    "propertyType": "msg",
+    "rules": [
+      { "t": "gte", "v": "0.8", "vt": "num" },
+      { "t": "lte", "v": "0.2", "vt": "num" },
+      { "t": "else" }
+    ],
+    "checkall": "false",
+    "outputs": 3,
+    "x": 540,
+    "y": 100,
+    "wires": [["jevex1push"], ["jevex1log"], ["jevex1review"]]
+  },
+  {
+    "id": "jevex1push",
+    "type": "debug",
+    "z": "jevex1tab",
+    "name": "push notification",
+    "active": true,
+    "complete": "answer",
+    "targetType": "msg",
+    "x": 760,
+    "y": 60,
+    "wires": []
+  },
+  {
+    "id": "jevex1log",
+    "type": "debug",
+    "z": "jevex1tab",
+    "name": "log only",
+    "active": true,
+    "complete": "answer",
+    "targetType": "msg",
+    "x": 740,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "jevex1review",
+    "type": "debug",
+    "z": "jevex1tab",
+    "name": "uncertain → review",
+    "active": true,
+    "complete": "answer",
+    "targetType": "msg",
+    "x": 770,
+    "y": 140,
+    "wires": []
+  },
+  {
+    "id": "jevex1subject",
+    "type": "debug",
+    "z": "jevex1tab",
+    "name": "subject label",
+    "active": true,
+    "complete": "answer",
+    "targetType": "msg",
+    "x": 560,
+    "y": 200,
+    "wires": []
+  }
+]

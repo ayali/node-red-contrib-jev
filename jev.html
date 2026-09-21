@@ -1,0 +1,387 @@
+<!-- ============================== jev-config ============================== -->
+<script type="text/javascript">
+  RED.nodes.registerType("jev-config", {
+    category: "config",
+    defaults: {
+      name: { value: "" },
+      baseUrl: { value: "https://api.typesafe.ai", required: true },
+      model: { value: "jev-latest", required: true }
+    },
+    credentials: {
+      apiKey: { type: "password" }
+    },
+    label: function () {
+      return this.name || this.model || "TypeSafe";
+    }
+  });
+</script>
+
+<script type="text/html" data-template-name="jev-config">
+  <div class="form-row">
+    <label for="node-config-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-config-input-name" placeholder="TypeSafe" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-baseUrl"><i class="fa fa-globe"></i> Base URL</label>
+    <input type="text" id="node-config-input-baseUrl" placeholder="https://api.typesafe.ai" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-model"><i class="fa fa-cube"></i> Model</label>
+    <input type="text" id="node-config-input-model" placeholder="jev-latest" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-apiKey"><i class="fa fa-key"></i> API key</label>
+    <input type="password" id="node-config-input-apiKey" />
+  </div>
+  <div class="form-tips">
+    Point <b>Base URL</b> at a gateway (LiteLLM, Vercel AI Gateway, Opper) if you
+    proxy model traffic. The node appends <code>/v1/systemone</code>.
+  </div>
+</script>
+
+<!-- ================================= jev ================================= -->
+<script type="text/javascript">
+  (function () {
+    const TYPES = [
+      { v: "noul", l: "yes / no" },
+      { v: "choice", l: "choice" },
+      { v: "score", l: "score" }
+    ];
+
+    // Pre-0.2 stored questions as an API-shaped JSON string. Convert so an
+    // upgraded node opens with its questions intact instead of empty.
+    function apiToRows(obj) {
+      const rows = [];
+      Object.keys(obj || {}).forEach(function (key) {
+        const q = obj[key] || {};
+        const row = { key: key, type: q.type || "noul", instructions: q.instructions || "" };
+        if (q.type === "noul" && q.criteria) {
+          row.trueDesc = q.criteria["true"] || "";
+          row.falseDesc = q.criteria["false"] || "";
+        } else if (q.type === "choice") {
+          row.options = Object.keys(q.criteria || {}).map(function (name) {
+            return { name: name, desc: q.criteria[name] || "" };
+          });
+        } else if (q.type === "score") {
+          row.levels = (q.criteria || []).slice();
+        }
+        rows.push(row);
+      });
+      return rows;
+    }
+
+    function normaliseRows(value) {
+      if (Array.isArray(value)) return value;
+      if (typeof value === "string") {
+        try { return apiToRows(JSON.parse(value || "{}")); } catch (e) { return []; }
+      }
+      if (value && typeof value === "object") return apiToRows(value);
+      return [];
+    }
+
+    // ----------------------------------------------------- nested criteria --
+
+    function buildOptionList(container, options) {
+      const list = $('<ol class="jev-opt-list"></ol>').appendTo(container);
+      list.editableList({
+        addItem: function (row, index, data) {
+          data = data || {};
+          const wrap = $('<div style="display:flex; gap:6px; align-items:center"></div>').appendTo(row);
+          $('<input type="text" class="jev-opt-name" placeholder="option">')
+            .css({ flex: "0 0 32%" }).val(data.name || "").appendTo(wrap);
+          $('<input type="text" class="jev-opt-desc" placeholder="when this option applies (optional)">')
+            .css({ flex: "1 1 auto" }).val(data.desc || "").appendTo(wrap);
+        },
+        removable: true,
+        sortable: true,
+        height: "auto"
+      });
+      (options && options.length ? options : [{ name: "", desc: "" }])
+        .forEach(function (o) { list.editableList("addItem", o); });
+      return list;
+    }
+
+    function buildLevelList(container, levels) {
+      $('<div class="form-tips" style="margin-bottom:4px">Lowest level first. The score is a weighted position across them.</div>')
+        .appendTo(container);
+      const list = $('<ol class="jev-level-list"></ol>').appendTo(container);
+      list.editableList({
+        addItem: function (row, index, data) {
+          const wrap = $('<div style="display:flex; gap:6px; align-items:center"></div>').appendTo(row);
+          $('<span style="color:#999; flex:0 0 18px; text-align:right"></span>').text(index).appendTo(wrap);
+          $('<input type="text" class="jev-level-text" placeholder="what this level means">')
+            .css({ flex: "1 1 auto" }).val(typeof data === "string" ? data : (data && data.text) || "").appendTo(wrap);
+        },
+        removable: true,
+        sortable: true,
+        height: "auto"
+      });
+      (levels && levels.length ? levels : ["", ""])
+        .forEach(function (l) { list.editableList("addItem", l); });
+      return list;
+    }
+
+    // ------------------------------------------------------- question rows --
+
+    function buildQuestionRow(container, index, data) {
+      data = data || {};
+      const row = $('<div class="jev-q" style="padding:2px 0"></div>').appendTo(container);
+
+      const top = $('<div style="display:flex; gap:6px; margin-bottom:4px; align-items:center"></div>').appendTo(row);
+      $('<input type="text" class="jev-q-key" placeholder="answer name">')
+        .css({ flex: "0 0 34%" }).val(data.key || "").appendTo(top);
+      const type = $('<select class="jev-q-type"></select>').css({ flex: "0 0 110px" }).appendTo(top);
+      TYPES.forEach(function (t) { type.append($("<option>").val(t.v).text(t.l)); });
+      type.val(data.type || "noul");
+
+      $('<input type="text" class="jev-q-instructions" placeholder="What should the model decide?">')
+        .css({ width: "100%", marginBottom: "4px" }).val(data.instructions || "").appendTo(row);
+
+      const criteria = $('<div class="jev-q-criteria" style="padding-left:2px"></div>').appendTo(row);
+
+      function renderCriteria() {
+        criteria.empty();
+        const t = type.val();
+        if (t === "noul") {
+          const yes = $('<div style="display:flex; gap:6px; margin-bottom:3px; align-items:center"></div>').appendTo(criteria);
+          $('<span style="flex:0 0 40px; color:#999">true</span>').appendTo(yes);
+          $('<input type="text" class="jev-q-true" placeholder="what a yes means (optional, but worth writing)">')
+            .css({ flex: "1 1 auto" }).val(data.trueDesc || "").appendTo(yes);
+          const no = $('<div style="display:flex; gap:6px; align-items:center"></div>').appendTo(criteria);
+          $('<span style="flex:0 0 40px; color:#999">false</span>').appendTo(no);
+          $('<input type="text" class="jev-q-false" placeholder="what a no means">')
+            .css({ flex: "1 1 auto" }).val(data.falseDesc || "").appendTo(no);
+        } else if (t === "choice") {
+          buildOptionList(criteria, data.options);
+        } else if (t === "score") {
+          buildLevelList(criteria, data.levels);
+        }
+      }
+
+      type.on("change", function () {
+        // Keep whatever was typed for the other types, so switching back
+        // does not silently discard it.
+        readQuestionRow(container, data);
+        renderCriteria();
+      });
+      renderCriteria();
+    }
+
+    // Reads one question row out of the DOM, merging onto prior values so
+    // criteria for a type that is not currently shown survive a type switch.
+    function readQuestionRow(container, prior) {
+      const out = Object.assign({}, prior || {});
+      out.key = (container.find(".jev-q-key").first().val() || "").trim();
+      out.type = container.find(".jev-q-type").first().val();
+      out.instructions = container.find(".jev-q-instructions").first().val() || "";
+
+      const t = out.type;
+      if (t === "noul") {
+        const tv = container.find(".jev-q-true").first();
+        const fv = container.find(".jev-q-false").first();
+        if (tv.length) out.trueDesc = tv.val();
+        if (fv.length) out.falseDesc = fv.val();
+      } else if (t === "choice") {
+        const list = container.find(".jev-opt-list").first();
+        if (list.length) {
+          const options = [];
+          list.find(".jev-opt-name").each(function () {
+            const el = $(this);
+            const name = (el.val() || "").trim();
+            if (!name) return;
+            options.push({ name: name, desc: el.siblings(".jev-opt-desc").val() || "" });
+          });
+          out.options = options;
+        }
+      } else if (t === "score") {
+        const list = container.find(".jev-level-list").first();
+        if (list.length) {
+          const levels = [];
+          list.find(".jev-level-text").each(function () {
+            const v = ($(this).val() || "").trim();
+            if (v) levels.push(v);
+          });
+          out.levels = levels;
+        }
+      }
+      return out;
+    }
+
+    function readAllQuestions() {
+      const rows = [];
+      $("#node-input-question-list").editableList("items").each(function () {
+        const q = readQuestionRow($(this), null);
+        if (q.key) rows.push(q);
+      });
+      return rows;
+    }
+
+    // ------------------------------------------------------- node registry --
+
+    RED.nodes.registerType("jev", {
+      category: "function",
+      color: "#c7e3c7",
+      icon: "font-awesome/fa-question-circle",
+      defaults: {
+        name: { value: "" },
+        server: { value: "", type: "jev-config", required: true },
+        mode: { value: "single" },
+        state: { value: "payload" },
+        stateType: { value: "msg" },
+        questions: {
+          value: [
+            {
+              key: "notify",
+              type: "noul",
+              instructions: "Should this interrupt someone right now?",
+              trueDesc: "",
+              falseDesc: ""
+            }
+          ]
+        },
+        answerProp: { value: "answer" },
+        outputProp: { value: "jev" },
+        timeout: { value: 15000 },
+        retries: { value: 2 },
+        outputs: { value: 1 }
+      },
+      inputs: 1,
+      outputs: 1,
+      label: function () {
+        return this.name || "jev";
+      },
+      labelStyle: function () {
+        return this.name ? "node_label_italic" : "";
+      },
+      outputLabels: function (index) {
+        if (this.mode !== "split") return "answers";
+        const rows = normaliseRows(this.questions);
+        return rows[index] ? rows[index].key : "output " + index;
+      },
+      oneditprepare: function () {
+        const node = this;
+
+        $("#node-input-state").typedInput({
+          default: "msg",
+          typeField: $("#node-input-stateType"),
+          types: ["msg", "flow", "global", "str", "jsonata"]
+        });
+
+        $("#node-input-question-list").editableList({
+          addItem: buildQuestionRow,
+          removable: true,
+          sortable: true,
+          height: "auto",
+          addButton: "add question"
+        });
+
+        normaliseRows(node.questions).forEach(function (q) {
+          $("#node-input-question-list").editableList("addItem", q);
+        });
+      },
+      oneditsave: function () {
+        this.questions = readAllQuestions();
+        this.outputs = $("#node-input-mode").val() === "split"
+          ? Math.max(this.questions.length, 1)
+          : 1;
+      }
+    });
+  })();
+</script>
+
+<script type="text/html" data-template-name="jev">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" placeholder="Name" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-server"><i class="fa fa-server"></i> Server</label>
+    <input type="text" id="node-input-server" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-state"><i class="fa fa-sign-in"></i> State</label>
+    <input type="text" id="node-input-state" style="width:70%" />
+    <input type="hidden" id="node-input-stateType" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-mode"><i class="fa fa-random"></i> Outputs</label>
+    <select id="node-input-mode" style="width:70%">
+      <option value="single">One output — every answer on msg.jev</option>
+      <option value="split">One output per question — its answer on msg.answer</option>
+    </select>
+  </div>
+
+  <div class="form-row">
+    <label style="width:100%"><i class="fa fa-question-circle"></i> Questions</label>
+    <ol id="node-input-question-list"></ol>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-outputProp"><i class="fa fa-sign-out"></i> Response</label>
+    <span style="color:#888">msg.</span>
+    <input type="text" id="node-input-outputProp" style="width:25%" placeholder="jev" />
+    <label for="node-input-answerProp" style="width:auto; margin-left:14px">Answer</label>
+    <span style="color:#888">msg.</span>
+    <input type="text" id="node-input-answerProp" style="width:25%" placeholder="answer" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-timeout"><i class="fa fa-clock-o"></i> Timeout</label>
+    <input type="number" id="node-input-timeout" min="500" step="500" style="width:100px" />
+    <span style="margin-left:8px; color:#888">ms</span>
+    <label for="node-input-retries" style="width:auto; margin-left:16px">Retries</label>
+    <input type="number" id="node-input-retries" min="0" max="8" style="width:60px" />
+  </div>
+  <div class="form-tips">
+    Questions are evaluated in parallel against the same state, so adding one
+    costs little more than the tokens it takes to write.
+  </div>
+</script>
+
+<script type="text/html" data-help-name="jev">
+  <p>
+    Asks TypeSafe's Jev model typed questions about a state and returns calibrated
+    answers — a probability, a class, or a rubric score. It does not generate text.
+  </p>
+
+  <h3>Inputs</h3>
+  <dl class="message-properties">
+    <dt>payload<span class="property-type">string | object | array</span></dt>
+    <dd>Default source for the evaluated state; configurable in <b>State</b>.</dd>
+    <dt class="optional">questions<span class="property-type">object</span></dt>
+    <dd>
+      API-shaped question map that overrides the configured set. In split mode the
+      outputs stay bound to the configured question names, so an override can
+      rephrase a question but cannot add an output.
+    </dd>
+    <dt class="optional">model<span class="property-type">string</span></dt>
+    <dd>Overrides the model set on the config node.</dd>
+  </dl>
+
+  <h3>Outputs</h3>
+  <p>
+    <b>One output</b> puts the whole response on <code>msg.jev</code> as
+    <code>{ model, answers, usage, latency_ms }</code>.
+  </p>
+  <p>
+    <b>One output per question</b> emits a copy of the message on each output, in
+    the order the questions are listed, with that question's answer on
+    <code>msg.answer</code> and the full response still on <code>msg.jev</code>.
+    Put a Switch node on each branch to turn a probability into a decision, so the
+    threshold stays visible on the canvas.
+  </p>
+
+  <h3>Question types</h3>
+  <ul>
+    <li><b>yes / no</b> (<code>noul</code>) — <code>msg.answer.noul</code>, a probability from 0 to 1.</li>
+    <li><b>choice</b> — <code>choice</code>, the full <code>probabilities</code> map, and a <code>confidence</code>.</li>
+    <li><b>score</b> — a weighted <code>score</code> across the levels, with <code>legend</code>, <code>probabilities</code> and <code>confidence</code>.</li>
+  </ul>
+
+  <h3>Details</h3>
+  <p>
+    Errors are raised to the node and can be handled with a Catch node; 429 and 529
+    responses are retried with exponential backoff. Question problems that the API
+    would reject — an empty instruction, a choice with no options, a score with
+    fewer than two levels — are caught at deploy time and shown on the node status.
+  </p>
+</script>
