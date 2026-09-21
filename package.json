@@ -1,7 +1,7 @@
 {
   "name": "@ayali/node-red-contrib-jev",
-  "version": "1.0.0",
-  "description": "TypeSafe Jev (System One) typed decisions for Node-RED — evaluate a state and route on the answer",
+  "version": "1.0.1",
+  "description": "Typed, calibrated decisions in Node-RED — one answer per question, backed by TypeSafe's Jev model",
   "license": "MIT",
   "author": "Ayal Itzkovitz",
   "homepage": "https://github.com/ayali/node-red-contrib-jev#readme",
