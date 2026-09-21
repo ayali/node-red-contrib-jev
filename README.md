@@ -70,10 +70,24 @@ rather than costing a request.
 ```
 
 **One output per question** emits a copy of the message on each output, in list
-order, with that question's answer on `msg.answer` and the full response still on
-`msg.jev`. Put a Switch node on each branch to turn a probability into a decision —
-the node deliberately does not apply thresholds itself, so every decision boundary
-stays visible on the canvas rather than buried in an edit dialog.
+order, carrying only that question's answer:
+
+```json
+{
+  "answer": { "type": "noul", "noul": 0.93 },
+  "jev": {
+    "question": "needs_action",
+    "model": "jev-latest",
+    "usage": { "input_tokens": 312, "output_tokens": 48 },
+    "latency_ms": 180
+  }
+}
+```
+
+No `answers` map on the branches — a branch cannot read another question's result by
+accident. Put a Switch node on each one to turn a probability into a decision; the
+node deliberately does not apply thresholds itself, so every decision boundary stays
+visible on the canvas rather than buried in an edit dialog.
 
 ## Dynamic questions
 

@@ -1,19 +1,18 @@
 {
   "name": "@ayali/node-red-jev",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "TypeSafe Jev (System One) typed decisions for Node-RED — evaluate a state and route on the answer",
   "license": "MIT",
   "author": "Ayal Itzkovitz",
-  "homepage": "https://github.com/YOUR-GH-USER/node-red-jev#readme",
+  "homepage": "https://github.com/ayali/node-red-contrib-jev#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/YOUR-GH-USER/node-red-jev.git"
+    "url": "git+https://github.com/ayali/node-red-contrib-jev.git"
   },
   "bugs": {
-    "url": "https://github.com/YOUR-GH-USER/node-red-jev/issues"
+    "url": "https://github.com/ayali/node-red-contrib-jev/issues"
   },
   "keywords": [
-    "node-red",
     "jev",
     "typesafe",
     "classification",
@@ -42,5 +41,6 @@
   },
   "scripts": {
     "test": "node --check jev.js"
-  }
+  },
+  "private": true
 }

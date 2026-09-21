@@ -364,10 +364,12 @@
   </p>
   <p>
     <b>One output per question</b> emits a copy of the message on each output, in
-    the order the questions are listed, with that question's answer on
-    <code>msg.answer</code> and the full response still on <code>msg.jev</code>.
-    Put a Switch node on each branch to turn a probability into a decision, so the
-    threshold stays visible on the canvas.
+    the order the questions are listed, carrying only that question's answer on
+    <code>msg.answer</code>. <code>msg.jev</code> holds just the metadata for the
+    call — <code>question</code>, <code>model</code>, <code>usage</code> and
+    <code>latency_ms</code> — with no answers map, so a branch cannot read another
+    question's result by accident. Put a Switch node on each branch to turn a
+    probability into a decision, so the threshold stays visible on the canvas.
   </p>
 
   <h3>Question types</h3>

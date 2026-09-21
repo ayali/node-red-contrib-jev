@@ -278,9 +278,8 @@ module.exports = function (RED) {
 
       const ms = Date.now() - started;
       const answers = result.answers || {};
-      const envelope = {
+      const meta = {
         model: result.model,
-        answers: answers,
         usage: result.usage,
         latency_ms: ms
       };
@@ -292,18 +291,24 @@ module.exports = function (RED) {
       });
 
       if (node.mode !== "split" || node.outputs <= 1) {
-        RED.util.setMessageProperty(msg, node.outputProp, envelope, true);
+        RED.util.setMessageProperty(
+          msg,
+          node.outputProp,
+          Object.assign({ answers: answers }, meta),
+          true
+        );
         send(msg);
         return done();
       }
 
-      // One output per configured question, in editor order. Each branch gets
-      // its own answer on msg.answer and the whole response on msg.jev.
+      // One output per configured question, in editor order. Each branch carries
+      // only its own answer — no answers map, so a branch cannot read the wrong
+      // question's result by accident.
       const wires = configured.keys.slice(0, node.outputs).map(function (key, i) {
         const answer = answers[key];
         if (!answer) return null;
         const m = i === 0 ? msg : RED.util.cloneMessage(msg);
-        RED.util.setMessageProperty(m, node.outputProp, Object.assign({ question: key }, envelope), true);
+        RED.util.setMessageProperty(m, node.outputProp, Object.assign({ question: key }, meta), true);
         RED.util.setMessageProperty(m, node.answerProp, answer, true);
         return m;
       });
