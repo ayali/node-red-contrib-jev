@@ -239,8 +239,10 @@
             }
           ]
         },
+        metadataProp: { value: "jev" },
+        questionProp: { value: "question" },
         answerProp: { value: "answer" },
-        outputProp: { value: "jev" },
+        responseProp: { value: "answers" },
         timeout: { value: 15000 },
         retries: { value: 2 },
         outputs: { value: 1 }
@@ -279,29 +281,29 @@
           $("#node-input-question-list").editableList("addItem", q);
         });
 
-        // The two rename boxes are siblings on the message, not nested — spell
-        // out what actually lands where, using whatever names are typed in.
+        // Every property the node writes is a sibling on the message, never
+        // nested — spell out what lands where, using the names typed in.
         function refreshShape() {
           const split = $("#node-input-mode").val() === "split";
-          const jev = $("#node-input-outputProp").val() || "jev";
-          const ans = $("#node-input-answerProp").val() || "answer";
+          const bold = (id, fallback) =>
+            "msg." + $("<b>").text($(id).val() || fallback).prop("outerHTML");
 
           $(".jev-split-only").toggle(split);
-          $("#jev-response-label").text(split ? "Metadata" : "Response");
+          $(".jev-single-only").toggle(!split);
 
           $("#jev-shape-hint").html(
             split
-              ? "msg." + $("<b>").text(ans).prop("outerHTML") +
-                  " &nbsp;= this output&rsquo;s answer<br>" +
-                "msg." + $("<b>").text(jev).prop("outerHTML") +
-                  " &nbsp;= { question, model, usage, latency_ms }"
-              : "msg." + $("<b>").text(jev).prop("outerHTML") +
-                  " &nbsp;= { answers, model, usage, latency_ms }"
+              ? bold("#node-input-metadataProp", "jev") + " = { model, usage, latency_ms }<br>" +
+                bold("#node-input-questionProp", "question") + " = this output&rsquo;s question name<br>" +
+                bold("#node-input-answerProp", "answer") + " = its answer"
+              : bold("#node-input-metadataProp", "jev") + " = { model, usage, latency_ms }<br>" +
+                bold("#node-input-responseProp", "answers") + " = one answer per question, keyed by name"
           );
         }
 
         $("#node-input-mode").on("change", refreshShape);
-        $("#node-input-outputProp, #node-input-answerProp").on("keyup change", refreshShape);
+        $("#node-input-metadataProp, #node-input-questionProp, #node-input-answerProp, #node-input-responseProp")
+          .on("keyup change", refreshShape);
         refreshShape();
       },
       oneditsave: function () {
@@ -331,8 +333,8 @@
   <div class="form-row">
     <label for="node-input-mode"><i class="fa fa-random"></i> Outputs</label>
     <select id="node-input-mode" style="width:70%">
-      <option value="single">One output — every answer on msg.jev</option>
-      <option value="split">One output per question — its answer on msg.answer</option>
+      <option value="single">One output</option>
+      <option value="split">One output per question</option>
     </select>
   </div>
 
@@ -341,15 +343,25 @@
     <ol id="node-input-question-list"></ol>
   </div>
 
+  <div class="form-row">
+    <label for="node-input-metadataProp"><i class="fa fa-info-circle"></i> Metadata</label>
+    <span style="color:#888">msg.</span>
+    <input type="text" id="node-input-metadataProp" style="width:30%" placeholder="jev" />
+  </div>
+  <div class="form-row jev-split-only">
+    <label for="node-input-questionProp"><i class="fa fa-question-circle"></i> Question</label>
+    <span style="color:#888">msg.</span>
+    <input type="text" id="node-input-questionProp" style="width:30%" placeholder="question" />
+  </div>
   <div class="form-row jev-split-only">
     <label for="node-input-answerProp"><i class="fa fa-check-circle"></i> Answer</label>
     <span style="color:#888">msg.</span>
     <input type="text" id="node-input-answerProp" style="width:30%" placeholder="answer" />
   </div>
-  <div class="form-row">
-    <label for="node-input-outputProp"><i class="fa fa-sign-out"></i> <span id="jev-response-label">Response</span></label>
+  <div class="form-row jev-single-only">
+    <label for="node-input-responseProp"><i class="fa fa-sign-out"></i> Response</label>
     <span style="color:#888">msg.</span>
-    <input type="text" id="node-input-outputProp" style="width:30%" placeholder="jev" />
+    <input type="text" id="node-input-responseProp" style="width:30%" placeholder="answers" />
   </div>
   <div class="form-row">
     <label>&nbsp;</label>
@@ -389,18 +401,32 @@
   </dl>
 
   <h3>Outputs</h3>
-  <p>
-    <b>One output</b> puts the whole response on <code>msg.jev</code> as
-    <code>{ model, answers, usage, latency_ms }</code>.
-  </p>
+  <p><b>One output</b> sets two properties:</p>
+  <dl class="message-properties">
+    <dt>jev<span class="property-type">object</span></dt>
+    <dd><code>{ model, usage, latency_ms }</code></dd>
+    <dt>answers<span class="property-type">object</span></dt>
+    <dd>One answer per question, keyed by question name.</dd>
+  </dl>
   <p>
     <b>One output per question</b> emits a copy of the message on each output, in
-    the order the questions are listed, carrying only that question's answer on
-    <code>msg.answer</code>. <code>msg.jev</code> holds just the metadata for the
-    call — <code>question</code>, <code>model</code>, <code>usage</code> and
-    <code>latency_ms</code> — with no answers map, so a branch cannot read another
-    question's result by accident. Put a Switch node on each branch to turn a
-    probability into a decision, so the threshold stays visible on the canvas.
+    the order the questions are listed, and sets three:
+  </p>
+  <dl class="message-properties">
+    <dt>jev<span class="property-type">object</span></dt>
+    <dd><code>{ model, usage, latency_ms }</code></dd>
+    <dt>question<span class="property-type">string</span></dt>
+    <dd>The name of the question this output belongs to.</dd>
+    <dt>answer<span class="property-type">object</span></dt>
+    <dd>
+      That question's answer, and nothing else — a branch cannot read another
+      question's result by accident.
+    </dd>
+  </dl>
+  <p>
+    All four property names are configurable in the edit dialog. Put a Switch node
+    on each branch to turn a probability into a decision, so the threshold stays
+    visible on the canvas.
   </p>
 
   <h3>Question types</h3>

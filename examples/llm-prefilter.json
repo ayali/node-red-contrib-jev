@@ -18,7 +18,11 @@
     "type": "inject",
     "z": "jevex2tab",
     "name": "sample message",
-    "props": [{ "p": "payload" }],
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
     "repeat": "",
     "crontab": "",
     "once": false,
@@ -27,7 +31,11 @@
     "payloadType": "str",
     "x": 160,
     "y": 120,
-    "wires": [["jevex2jev"]]
+    "wires": [
+      [
+        "jevex2jev"
+      ]
+    ]
   },
   {
     "id": "jevex2jev",
@@ -51,41 +59,79 @@
         "type": "choice",
         "instructions": "What is this message about?",
         "options": [
-          { "name": "schedule", "desc": "Times, dates, pickup, cancellations" },
-          { "name": "logistics", "desc": "Items to bring, forms, payments" },
-          { "name": "social", "desc": "Chatter, congratulations, photos" },
-          { "name": "urgent", "desc": "Safety, illness, or something happening today" }
+          {
+            "name": "schedule",
+            "desc": "Times, dates, pickup, cancellations"
+          },
+          {
+            "name": "logistics",
+            "desc": "Items to bring, forms, payments"
+          },
+          {
+            "name": "social",
+            "desc": "Chatter, congratulations, photos"
+          },
+          {
+            "name": "urgent",
+            "desc": "Safety, illness, or something happening today"
+          }
         ]
       },
       {
         "key": "time_pressure",
         "type": "score",
         "instructions": "How soon must this be acted on?",
-        "levels": ["Whenever", "This week", "Today"]
+        "levels": [
+          "Whenever",
+          "This week",
+          "Today"
+        ]
       }
     ],
-    "answerProp": "answer",
-    "outputProp": "jev",
     "timeout": 15000,
     "retries": 2,
     "outputs": 1,
     "x": 350,
     "y": 120,
-    "wires": [["jevex2switch"]]
+    "wires": [
+      [
+        "jevex2switch"
+      ]
+    ],
+    "metadataProp": "jev",
+    "questionProp": "question",
+    "answerProp": "answer",
+    "responseProp": "answers"
   },
   {
     "id": "jevex2switch",
     "type": "switch",
     "z": "jevex2tab",
     "name": "act?",
-    "property": "jev.answers.needs_action.noul",
+    "property": "answers.needs_action.noul",
     "propertyType": "msg",
-    "rules": [{ "t": "gte", "v": "0.6", "vt": "num" }, { "t": "else" }],
+    "rules": [
+      {
+        "t": "gte",
+        "v": "0.6",
+        "vt": "num"
+      },
+      {
+        "t": "else"
+      }
+    ],
     "checkall": "false",
     "outputs": 2,
     "x": 510,
     "y": 120,
-    "wires": [["jevex2llm"], ["jevex2drop"]]
+    "wires": [
+      [
+        "jevex2llm"
+      ],
+      [
+        "jevex2drop"
+      ]
+    ]
   },
   {
     "id": "jevex2llm",
@@ -93,7 +139,7 @@
     "z": "jevex2tab",
     "name": "→ LLM summariser",
     "active": true,
-    "complete": "jev",
+    "complete": "true",
     "targetType": "msg",
     "x": 710,
     "y": 90,
@@ -105,7 +151,7 @@
     "z": "jevex2tab",
     "name": "→ digest only",
     "active": true,
-    "complete": "jev",
+    "complete": "true",
     "targetType": "msg",
     "x": 700,
     "y": 150,

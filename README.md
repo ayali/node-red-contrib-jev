@@ -50,43 +50,33 @@ rather than costing a request.
 
 ## Outputs
 
-**One output** puts the whole response on `msg.jev`:
+**One output** sets two properties:
 
-```json
-{
-  "model": "jev-latest",
-  "answers": {
-    "needs_action": { "type": "noul", "noul": 0.93 },
-    "category": {
-      "type": "choice",
-      "choice": "schedule",
-      "probabilities": { "schedule": 0.88, "logistics": 0.07, "social": 0.03, "urgent": 0.02 },
-      "confidence": 0.85
-    }
-  },
-  "usage": { "input_tokens": 312, "output_tokens": 48 },
-  "latency_ms": 180
-}
+```js
+msg.jev      = { model: "jev-latest",
+                 usage: { input_tokens: 312, output_tokens: 48 },
+                 latency_ms: 180 }
+
+msg.answers  = { needs_action: { type: "noul", noul: 0.93 },
+                 category:     { type: "choice", choice: "schedule",
+                                 probabilities: { ... }, confidence: 0.85 } }
 ```
 
 **One output per question** emits a copy of the message on each output, in list
-order, carrying only that question's answer:
+order, and sets three:
 
-```json
-{
-  "answer": { "type": "noul", "noul": 0.93 },
-  "jev": {
-    "question": "needs_action",
-    "model": "jev-latest",
-    "usage": { "input_tokens": 312, "output_tokens": 48 },
-    "latency_ms": 180
-  }
-}
+```js
+msg.jev      = { model, usage, latency_ms }
+msg.question = "needs_action"
+msg.answer   = { type: "noul", noul: 0.93 }
 ```
 
-No `answers` map on the branches — a branch cannot read another question's result by
-accident. Put a Switch node on each one to turn a probability into a decision; the
-node deliberately does not apply thresholds itself, so every decision boundary stays
+No answers map on the branches — a branch cannot read another question's result by
+accident. All four names are configurable in the edit dialog if they collide with
+something else in your flows.
+
+Put a Switch node on each branch to turn a probability into a decision; the node
+deliberately does not apply thresholds itself, so every decision boundary stays
 visible on the canvas rather than buried in an edit dialog.
 
 ## Dynamic questions

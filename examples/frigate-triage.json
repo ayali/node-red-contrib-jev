@@ -18,7 +18,11 @@
     "type": "inject",
     "z": "jevex1tab",
     "name": "sample event",
-    "props": [{ "p": "payload" }],
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
     "repeat": "",
     "crontab": "",
     "once": false,
@@ -27,7 +31,11 @@
     "payloadType": "json",
     "x": 150,
     "y": 140,
-    "wires": [["jevex1jev"]]
+    "wires": [
+      [
+        "jevex1jev"
+      ]
+    ]
   },
   {
     "id": "jevex1jev",
@@ -51,21 +59,42 @@
         "type": "choice",
         "instructions": "What triggered this event?",
         "options": [
-          { "name": "person", "desc": "" },
-          { "name": "vehicle", "desc": "" },
-          { "name": "animal", "desc": "" },
-          { "name": "other", "desc": "Foliage, shadows, rain, or an unclear detection" }
+          {
+            "name": "person",
+            "desc": ""
+          },
+          {
+            "name": "vehicle",
+            "desc": ""
+          },
+          {
+            "name": "animal",
+            "desc": ""
+          },
+          {
+            "name": "other",
+            "desc": "Foliage, shadows, rain, or an unclear detection"
+          }
         ]
       }
     ],
-    "answerProp": "answer",
-    "outputProp": "jev",
     "timeout": 15000,
     "retries": 2,
     "outputs": 2,
     "x": 350,
     "y": 140,
-    "wires": [["jevex1sw"], ["jevex1subject"]]
+    "wires": [
+      [
+        "jevex1sw"
+      ],
+      [
+        "jevex1subject"
+      ]
+    ],
+    "metadataProp": "jev",
+    "questionProp": "question",
+    "answerProp": "answer",
+    "responseProp": "answers"
   },
   {
     "id": "jevex1sw",
@@ -75,15 +104,35 @@
     "property": "answer.noul",
     "propertyType": "msg",
     "rules": [
-      { "t": "gte", "v": "0.8", "vt": "num" },
-      { "t": "lte", "v": "0.2", "vt": "num" },
-      { "t": "else" }
+      {
+        "t": "gte",
+        "v": "0.8",
+        "vt": "num"
+      },
+      {
+        "t": "lte",
+        "v": "0.2",
+        "vt": "num"
+      },
+      {
+        "t": "else"
+      }
     ],
     "checkall": "false",
     "outputs": 3,
     "x": 540,
     "y": 100,
-    "wires": [["jevex1push"], ["jevex1log"], ["jevex1review"]]
+    "wires": [
+      [
+        "jevex1push"
+      ],
+      [
+        "jevex1log"
+      ],
+      [
+        "jevex1review"
+      ]
+    ]
   },
   {
     "id": "jevex1push",

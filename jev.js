@@ -184,8 +184,11 @@ module.exports = function (RED) {
     const server = RED.nodes.getNode(config.server);
 
     node.mode = config.mode || "single";
-    node.answerProp = (config.answerProp || "answer").replace(/^msg\./, "");
-    node.outputProp = (config.outputProp || "jev").replace(/^msg\./, "");
+    const prop = (v, d) => String(v || d).replace(/^msg\./, "");
+    node.metadataProp = prop(config.metadataProp, "jev");
+    node.questionProp = prop(config.questionProp, "question");
+    node.answerProp = prop(config.answerProp, "answer");
+    node.responseProp = prop(config.responseProp, "answers");
     node.outputs = parseInt(config.outputs, 10) || 1;
 
     node.timeout = parseInt(config.timeout, 10) || 15000;
@@ -291,12 +294,8 @@ module.exports = function (RED) {
       });
 
       if (node.mode !== "split" || node.outputs <= 1) {
-        RED.util.setMessageProperty(
-          msg,
-          node.outputProp,
-          Object.assign({ answers: answers }, meta),
-          true
-        );
+        RED.util.setMessageProperty(msg, node.metadataProp, meta, true);
+        RED.util.setMessageProperty(msg, node.responseProp, answers, true);
         send(msg);
         return done();
       }
@@ -308,7 +307,8 @@ module.exports = function (RED) {
         const answer = answers[key];
         if (!answer) return null;
         const m = i === 0 ? msg : RED.util.cloneMessage(msg);
-        RED.util.setMessageProperty(m, node.outputProp, Object.assign({ question: key }, meta), true);
+        RED.util.setMessageProperty(m, node.metadataProp, meta, true);
+        RED.util.setMessageProperty(m, node.questionProp, key, true);
         RED.util.setMessageProperty(m, node.answerProp, answer, true);
         return m;
       });
