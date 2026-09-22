@@ -1,15 +1,26 @@
 # @ayali/node-red-contrib-jev
 
-Typed, calibrated decisions in Node-RED, backed by TypeSafe's Jev model.
+Simple Node-RED integration to TypeSafe AI's runtime Jev model.
 
-Jev does not generate text. You give it a **state** and a map of named **questions**,
-and it returns one answer per question with probabilities attached. Every question in
-a request is evaluated in parallel, so asking five costs barely more than asking one.
+Jev is a *System One* model: it does not generate text. You give it a **state** and a
+list of named **questions**, and it returns one typed answer per question with
+probabilities attached. Answers come back in tens of milliseconds for a fraction of
+the cost of an LLM call, which makes it practical to ask a question of every event in
+a flow rather than only the interesting ones.
 
-Two nodes:
+Every question in a request is evaluated in parallel against the same state, so asking
+five costs barely more than asking one.
 
-- **jev-config** — endpoint, model, API key (stored as a Node-RED credential).
-- **jev** — evaluates a state against a list of typed questions, with one output for everything or one output per question.
+## Contents
+
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Nodes](#nodes)
+- [Questions](#questions)
+- [Outputs](#outputs)
+- [Examples](#examples)
+- [Dynamic questions](#dynamic-questions)
+- [Errors and status](#errors-and-status)
 
 ## Install
 
@@ -20,48 +31,76 @@ cd ~/.node-red
 npm install @ayali/node-red-contrib-jev
 ```
 
-For a Docker install, `/data` is the user directory:
+Docker, where `/data` is the user directory:
 
 ```bash
-docker exec -w /data nodered npm install @ayali/node-red-contrib-jev
-docker restart nodered
+docker exec -w /data <container> npm install @ayali/node-red-contrib-jev
+docker restart <container>
 ```
 
-Requires Node.js 18+ (uses the built-in `fetch`) and Node-RED 3.1+.
-Import the flows under **Import → Examples → @ayali/node-red-contrib-jev**.
+Requires Node.js 18 or later (the node uses the built-in `fetch`) and Node-RED 3.1+.
+You will need an API key from [TypeSafe](https://typesafe.ai).
+
+## Quick start
+
+1. Drag a **jev** node onto the canvas and open it.
+2. Beside **Server**, click the pencil and add your API key. The key is stored as a
+   Node-RED credential, so it stays out of your flow exports.
+3. Leave **State** as `msg.payload`.
+4. In **Questions**, name the first row `urgent`, leave the type as *yes / no*, and
+   write an instruction: `Does this message need attention today?`
+5. Wire an inject node with some string payload into it, and a debug node set to
+   *complete msg object* on the output.
+6. Deploy and inject. `msg.answers.urgent.noul` is a probability between 0 and 1.
+
+## Nodes
+
+**jev-config** holds the endpoint, the model name and the API key. Point **Base URL**
+at a gateway (LiteLLM, Vercel AI Gateway, Opper) if you proxy model traffic; the node
+appends `/v1/systemone`.
+
+**jev** evaluates a state against the questions you define, with either one output
+carrying every answer or one output per question.
 
 ## Questions
 
-Questions are edited as a list in the node's edit dialog — one row each, with a
-name, a type, the instruction, and the criteria fields for that type. The name you
-give a row is the key its answer comes back under.
+Questions are edited as a list in the node's dialog — one row each, with a name, a
+type, an instruction, and the criteria fields for that type. The name is the key the
+answer comes back under.
 
-| type | criteria you fill in | answer |
+| type | criteria you fill in | answer fields |
 |---|---|---|
-| yes / no (`noul`) | optional description of what true and false mean | `noul`, a probability 0–1 |
-| choice | option name + when it applies | `choice`, `probabilities`, `confidence` |
-| score | ordered levels, lowest first | weighted `score`, `legend`, `probabilities`, `confidence` |
+| yes / no (`noul`) | optional description of what true and false mean | `noul` — a probability from 0 to 1 |
+| choice | option name, and when it applies | `choice`, `probabilities`, `confidence` |
+| score | ordered levels, lowest first | `score` (weighted), `legend`, `probabilities`, `confidence` |
+
+Criteria are optional on a yes/no question but worth writing — they are the cheapest
+accuracy you will buy. A choice option with no description is sent as `null`, which is
+fine when the name says enough.
 
 Problems the API would reject — an empty instruction, a choice with no options, a
-score with fewer than two levels — are caught at deploy and shown on the node status
-rather than costing a request.
+score with fewer than two levels — are caught at deploy time and shown on the node
+status rather than costing a request.
 
 ## Outputs
 
 **One output** sets two properties:
 
 ```js
-msg.jev      = { model: "jev-latest",
-                 usage: { input_tokens: 312, output_tokens: 48 },
-                 latency_ms: 180 }
+msg.jev     = { model: "jev-latest",
+                usage: { input_tokens: 312, output_tokens: 48 },
+                latency_ms: 180 }
 
-msg.answers  = { needs_action: { type: "noul", noul: 0.93 },
-                 category:     { type: "choice", choice: "schedule",
-                                 probabilities: { ... }, confidence: 0.85 } }
+msg.answers = { needs_action: { type: "noul", noul: 0.93 },
+                category:     { type: "choice",
+                                choice: "schedule",
+                                probabilities: { schedule: 0.88, logistics: 0.07,
+                                                 social: 0.03, urgent: 0.02 },
+                                confidence: 0.85 } }
 ```
 
-**One output per question** emits a copy of the message on each output, in list
-order, and sets three:
+**One output per question** emits a copy of the message on each output, in the order
+the questions are listed, and sets three:
 
 ```js
 msg.jev      = { model, usage, latency_ms }
@@ -69,28 +108,94 @@ msg.question = "needs_action"
 msg.answer   = { type: "noul", noul: 0.93 }
 ```
 
-No answers map on the branches — a branch cannot read another question's result by
-accident. All four names are configurable in the edit dialog if they collide with
-something else in your flows.
+There is no answers map on the branches, so a branch cannot read another question's
+result by accident. All four property names are configurable in the dialog if they
+collide with something else in your flows.
 
-Put a Switch node on each branch to turn a probability into a decision; the node
-deliberately does not apply thresholds itself, so every decision boundary stays
-visible on the canvas rather than buried in an edit dialog.
+The node deliberately does not apply thresholds itself. Put a Switch node on each
+branch to turn a probability into a decision, so every decision boundary stays visible
+on the canvas rather than buried in an edit dialog.
+
+## Examples
+
+Both flows are installed with the node — **Import → Examples → @ayali/node-red-contrib-jev**.
+They use inject nodes with sample payloads so you can run them before wiring anything
+real, and you will need to add your API key to the config node.
+
+### Camera event triage
+
+![Camera event triage flow](https://raw.githubusercontent.com/ayali/node-red-contrib-jev/main/docs/example-frigate-triage.png)
+
+One output per question. A Frigate event is evaluated for whether it is worth
+interrupting someone, and separately for what triggered it. The yes/no branch goes
+into a Switch node that splits on a confidence band: at or above 0.8 sends a
+notification, at or below 0.2 logs it quietly, and anything between goes to a review
+queue rather than being guessed at.
+
+Swap the inject node for your `frigate/events` MQTT in node to run it for real.
+
+<details>
+<summary>Flow JSON</summary>
+
+```json
+[{"id":"jevex1tab","type":"tab","label":"Jev \u2014 Frigate triage","disabled":false,"info":"One output per question. Each branch decides its own threshold in a Switch node, so the decision boundary stays visible on the canvas.\n\nSwap the inject node for your `frigate/events` MQTT in node."},{"id":"jevex1cfg","type":"jev-config","name":"TypeSafe","baseUrl":"https://api.typesafe.ai","model":"jev-latest"},{"id":"jevex1inject","type":"inject","z":"jevex1tab","name":"sample event","props":[{"p":"payload"}],"repeat":"","crontab":"","once":false,"topic":"","payload":"{\"camera\":\"front_gate\",\"label\":\"person\",\"score\":0.81,\"zones\":[\"driveway\"],\"local_time\":\"02:14\",\"stationary\":false,\"recent_similar_events\":0}","payloadType":"json","x":150,"y":140,"wires":[["jevex1jev"]]},{"id":"jevex1jev","type":"jev","z":"jevex1tab","name":"triage event","server":"jevex1cfg","mode":"split","state":"payload","stateType":"msg","questions":[{"key":"notify","type":"noul","instructions":"Should this camera event interrupt someone in the house right now?","trueDesc":"A person or vehicle somewhere or at a time that warrants attention, e.g. an unrecognised person at the gate at night","falseDesc":"Routine or expected: a known car in the driveway, an animal, foliage or rain, a repeat of an event already seen"},{"key":"subject","type":"choice","instructions":"What triggered this event?","options":[{"name":"person","desc":""},{"name":"vehicle","desc":""},{"name":"animal","desc":""},{"name":"other","desc":"Foliage, shadows, rain, or an unclear detection"}]}],"timeout":15000,"retries":2,"outputs":2,"x":350,"y":140,"wires":[["jevex1sw"],["jevex1subject"]],"metadataProp":"jev","questionProp":"question","answerProp":"answer","responseProp":"answers"},{"id":"jevex1sw","type":"switch","z":"jevex1tab","name":"p >= 0.8 ?","property":"answer.noul","propertyType":"msg","rules":[{"t":"gte","v":"0.8","vt":"num"},{"t":"lte","v":"0.2","vt":"num"},{"t":"else"}],"checkall":"false","outputs":3,"x":540,"y":100,"wires":[["jevex1push"],["jevex1log"],["jevex1review"]]},{"id":"jevex1push","type":"debug","z":"jevex1tab","name":"push notification","active":true,"complete":"answer","targetType":"msg","x":760,"y":60,"wires":[]},{"id":"jevex1log","type":"debug","z":"jevex1tab","name":"log only","active":true,"complete":"answer","targetType":"msg","x":740,"y":100,"wires":[]},{"id":"jevex1review","type":"debug","z":"jevex1tab","name":"uncertain \u2192 review","active":true,"complete":"answer","targetType":"msg","x":770,"y":140,"wires":[]},{"id":"jevex1subject","type":"debug","z":"jevex1tab","name":"subject label","active":true,"complete":"answer","targetType":"msg","x":560,"y":200,"wires":[]}]
+```
+
+</details>
+
+### Prefilter in front of an LLM
+
+![LLM prefilter flow](https://raw.githubusercontent.com/ayali/node-red-contrib-jev/main/docs/example-llm-prefilter.png)
+
+Single output. Every inbound message is triaged with three questions at once — whether
+it needs action, what it is about, and how soon — and only the minority that need prose
+reach the expensive model. A Switch node on `msg.answers.needs_action.noul` decides
+which.
+
+This is the cascade pattern, and the main reason to reach for a model like this: the
+classification costs a fraction of a cent, so it can run on everything.
+
+<details>
+<summary>Flow JSON</summary>
+
+```json
+[{"id":"jevex2tab","type":"tab","label":"Jev \u2014 LLM prefilter","disabled":false,"info":"Cascade pattern: Jev answers three questions about every inbound message for a fraction of a cent, and only the minority that need prose reach the expensive model.\n\nSingle-output mode \u2014 all three answers arrive together on msg.jev.answers."},{"id":"jevex2cfg","type":"jev-config","name":"TypeSafe","baseUrl":"https://api.typesafe.ai","model":"jev-latest"},{"id":"jevex2inject","type":"inject","z":"jevex2tab","name":"sample message","props":[{"p":"payload"}],"repeat":"","crontab":"","once":false,"topic":"","payload":"Reminder: tomorrow is a short day, pickup at 12:30 instead of 14:00. Please send a note if someone else is collecting.","payloadType":"str","x":160,"y":120,"wires":[["jevex2jev"]]},{"id":"jevex2jev","type":"jev","z":"jevex2tab","name":"triage","server":"jevex2cfg","mode":"single","state":"payload","stateType":"msg","questions":[{"key":"needs_action","type":"noul","instructions":"Does this message require a parent to do something?","trueDesc":"Asks for a reply, a signature, money, an item to bring, or a change to pickup or schedule","falseDesc":"Social chatter, thanks, photos, or information needing no response"},{"key":"category","type":"choice","instructions":"What is this message about?","options":[{"name":"schedule","desc":"Times, dates, pickup, cancellations"},{"name":"logistics","desc":"Items to bring, forms, payments"},{"name":"social","desc":"Chatter, congratulations, photos"},{"name":"urgent","desc":"Safety, illness, or something happening today"}]},{"key":"time_pressure","type":"score","instructions":"How soon must this be acted on?","levels":["Whenever","This week","Today"]}],"timeout":15000,"retries":2,"outputs":1,"x":350,"y":120,"wires":[["jevex2switch"]],"metadataProp":"jev","questionProp":"question","answerProp":"answer","responseProp":"answers"},{"id":"jevex2switch","type":"switch","z":"jevex2tab","name":"act?","property":"answers.needs_action.noul","propertyType":"msg","rules":[{"t":"gte","v":"0.6","vt":"num"},{"t":"else"}],"checkall":"false","outputs":2,"x":510,"y":120,"wires":[["jevex2llm"],["jevex2drop"]]},{"id":"jevex2llm","type":"debug","z":"jevex2tab","name":"\u2192 LLM summariser","active":true,"complete":"true","targetType":"msg","x":710,"y":90,"wires":[]},{"id":"jevex2drop","type":"debug","z":"jevex2tab","name":"\u2192 digest only","active":true,"complete":"true","targetType":"msg","x":700,"y":150,"wires":[]}]
+```
+
+</details>
 
 ## Dynamic questions
 
-`msg.questions` (API-shaped object) overrides the configured list, and `msg.model`
-overrides the configured model. In split mode the outputs stay bound to the
-configured question names, so an override can rephrase a question but cannot add an
-output.
+`msg.questions` overrides the configured list, and `msg.model` overrides the configured
+model. The override takes the API's own shape — an object keyed by question name:
 
-## API reference
+```js
+msg.questions = {
+  urgent: {
+    type: "noul",
+    instructions: "Does this need attention today?",
+    criteria: { "true": "...", "false": "..." }
+  }
+};
+```
 
-<https://docs.typesafe.ai/api>
+This lets you build criteria upstream in a Change node with JSONata and keep the jev
+node generic. In one-output-per-question mode the outputs stay bound to the configured
+question names, so an override can rephrase a question but cannot add an output.
 
-## Contributing
+## Errors and status
 
-Issues and pull requests: <https://github.com/ayali/node-red-contrib-jev>
+Failures are raised to the node and can be handled with a Catch node. HTTP 429 and 529
+responses are retried with exponential backoff, honouring `Retry-After` when the API
+sends one; **Timeout** and **Retries** are configurable in the dialog.
+
+The node status shows the answers and the round-trip time after a successful call, and
+the first problem otherwise.
+
+## Links
+
+- [TypeSafe API reference](https://docs.typesafe.ai/api)
+- [Issues](https://github.com/ayali/node-red-contrib-jev/issues)
 
 ## License
 
