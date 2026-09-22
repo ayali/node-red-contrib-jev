@@ -4,7 +4,7 @@
     "type": "tab",
     "label": "Jev — LLM prefilter",
     "disabled": false,
-    "info": "Cascade pattern: Jev answers three questions about every inbound message for a fraction of a cent, and only the minority that need prose reach the expensive model.\n\nSingle-output mode — all three answers arrive together on msg.jev.answers."
+    "info": "Triages a message with three questions of different types in a single request.\n\nAll the answers arrive together on msg.answers, and a Switch node reads one of them to decide whether the message is worth passing to a more expensive model."
   },
   {
     "id": "jevex2cfg",

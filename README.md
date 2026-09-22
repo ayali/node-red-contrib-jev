@@ -118,48 +118,56 @@ on the canvas rather than buried in an edit dialog.
 
 ## Examples
 
-Both flows are installed with the node — **Import → Examples → @ayali/node-red-contrib-jev**.
-They use inject nodes with sample payloads so you can run them before wiring anything
-real, and you will need to add your API key to the config node.
+Two worked flows ship with the node, under **Import → Examples → @ayali/node-red-contrib-jev**.
+Each one runs from an inject node carrying a sample payload, so both can be deployed
+and run as they are once a key is set on the config node.
 
 ### Camera event triage
 
 ![Camera event triage flow](https://raw.githubusercontent.com/ayali/node-red-contrib-jev/main/docs/example-frigate-triage.png)
 
-One output per question. A Frigate event is evaluated for whether it is worth
-interrupting someone, and separately for what triggered it. The yes/no branch goes
-into a Switch node that splits on a confidence band: at or above 0.8 sends a
-notification, at or below 0.2 logs it quietly, and anything between goes to a review
-queue rather than being guessed at.
+A security camera event — the camera, what was detected, the zone, the time, whether
+anything similar fired recently — is evaluated by two questions in a single request,
+each answer arriving on its own output.
 
-Swap the inject node for your `frigate/events` MQTT in node to run it for real.
+The first question is a yes/no: is this worth interrupting someone for. Its branch
+feeds a Switch node that splits on a confidence band rather than a single cutoff — at
+or above 0.8 a notification is warranted, at or below 0.2 it is routine, and the
+middle goes to a third branch instead of being forced either way. The second question
+is a choice that labels what triggered the event, and is handled independently.
+
+It shows the shape most flows end up with: one question that drives an action, another
+that adds context, and the threshold living in a Switch node on the canvas where it can
+be seen and changed.
 
 <details>
 <summary>Flow JSON</summary>
 
 ```json
-[{"id":"jevex1tab","type":"tab","label":"Jev \u2014 Frigate triage","disabled":false,"info":"One output per question. Each branch decides its own threshold in a Switch node, so the decision boundary stays visible on the canvas.\n\nSwap the inject node for your `frigate/events` MQTT in node."},{"id":"jevex1cfg","type":"jev-config","name":"TypeSafe","baseUrl":"https://api.typesafe.ai","model":"jev-latest"},{"id":"jevex1inject","type":"inject","z":"jevex1tab","name":"sample event","props":[{"p":"payload"}],"repeat":"","crontab":"","once":false,"topic":"","payload":"{\"camera\":\"front_gate\",\"label\":\"person\",\"score\":0.81,\"zones\":[\"driveway\"],\"local_time\":\"02:14\",\"stationary\":false,\"recent_similar_events\":0}","payloadType":"json","x":150,"y":140,"wires":[["jevex1jev"]]},{"id":"jevex1jev","type":"jev","z":"jevex1tab","name":"triage event","server":"jevex1cfg","mode":"split","state":"payload","stateType":"msg","questions":[{"key":"notify","type":"noul","instructions":"Should this camera event interrupt someone in the house right now?","trueDesc":"A person or vehicle somewhere or at a time that warrants attention, e.g. an unrecognised person at the gate at night","falseDesc":"Routine or expected: a known car in the driveway, an animal, foliage or rain, a repeat of an event already seen"},{"key":"subject","type":"choice","instructions":"What triggered this event?","options":[{"name":"person","desc":""},{"name":"vehicle","desc":""},{"name":"animal","desc":""},{"name":"other","desc":"Foliage, shadows, rain, or an unclear detection"}]}],"timeout":15000,"retries":2,"outputs":2,"x":350,"y":140,"wires":[["jevex1sw"],["jevex1subject"]],"metadataProp":"jev","questionProp":"question","answerProp":"answer","responseProp":"answers"},{"id":"jevex1sw","type":"switch","z":"jevex1tab","name":"p >= 0.8 ?","property":"answer.noul","propertyType":"msg","rules":[{"t":"gte","v":"0.8","vt":"num"},{"t":"lte","v":"0.2","vt":"num"},{"t":"else"}],"checkall":"false","outputs":3,"x":540,"y":100,"wires":[["jevex1push"],["jevex1log"],["jevex1review"]]},{"id":"jevex1push","type":"debug","z":"jevex1tab","name":"push notification","active":true,"complete":"answer","targetType":"msg","x":760,"y":60,"wires":[]},{"id":"jevex1log","type":"debug","z":"jevex1tab","name":"log only","active":true,"complete":"answer","targetType":"msg","x":740,"y":100,"wires":[]},{"id":"jevex1review","type":"debug","z":"jevex1tab","name":"uncertain \u2192 review","active":true,"complete":"answer","targetType":"msg","x":770,"y":140,"wires":[]},{"id":"jevex1subject","type":"debug","z":"jevex1tab","name":"subject label","active":true,"complete":"answer","targetType":"msg","x":560,"y":200,"wires":[]}]
+[{"id":"jevex1tab","type":"tab","label":"Jev \u2014 Frigate triage","disabled":false,"info":"Evaluates a camera event with two questions in one request, and gives each answer its own output.\n\nThe yes/no answer feeds a Switch node that splits on a confidence band rather than a single cutoff, so an uncertain answer lands on its own branch instead of being forced either way."},{"id":"jevex1cfg","type":"jev-config","name":"TypeSafe","baseUrl":"https://api.typesafe.ai","model":"jev-latest"},{"id":"jevex1inject","type":"inject","z":"jevex1tab","name":"sample event","props":[{"p":"payload"}],"repeat":"","crontab":"","once":false,"topic":"","payload":"{\"camera\":\"front_gate\",\"label\":\"person\",\"score\":0.81,\"zones\":[\"driveway\"],\"local_time\":\"02:14\",\"stationary\":false,\"recent_similar_events\":0}","payloadType":"json","x":150,"y":140,"wires":[["jevex1jev"]]},{"id":"jevex1jev","type":"jev","z":"jevex1tab","name":"triage event","server":"jevex1cfg","mode":"split","state":"payload","stateType":"msg","questions":[{"key":"notify","type":"noul","instructions":"Should this camera event interrupt someone in the house right now?","trueDesc":"A person or vehicle somewhere or at a time that warrants attention, e.g. an unrecognised person at the gate at night","falseDesc":"Routine or expected: a known car in the driveway, an animal, foliage or rain, a repeat of an event already seen"},{"key":"subject","type":"choice","instructions":"What triggered this event?","options":[{"name":"person","desc":""},{"name":"vehicle","desc":""},{"name":"animal","desc":""},{"name":"other","desc":"Foliage, shadows, rain, or an unclear detection"}]}],"timeout":15000,"retries":2,"outputs":2,"x":350,"y":140,"wires":[["jevex1sw"],["jevex1subject"]],"metadataProp":"jev","questionProp":"question","answerProp":"answer","responseProp":"answers"},{"id":"jevex1sw","type":"switch","z":"jevex1tab","name":"p >= 0.8 ?","property":"answer.noul","propertyType":"msg","rules":[{"t":"gte","v":"0.8","vt":"num"},{"t":"lte","v":"0.2","vt":"num"},{"t":"else"}],"checkall":"false","outputs":3,"x":540,"y":100,"wires":[["jevex1push"],["jevex1log"],["jevex1review"]]},{"id":"jevex1push","type":"debug","z":"jevex1tab","name":"push notification","active":true,"complete":"answer","targetType":"msg","x":760,"y":60,"wires":[]},{"id":"jevex1log","type":"debug","z":"jevex1tab","name":"log only","active":true,"complete":"answer","targetType":"msg","x":740,"y":100,"wires":[]},{"id":"jevex1review","type":"debug","z":"jevex1tab","name":"uncertain \u2192 review","active":true,"complete":"answer","targetType":"msg","x":770,"y":140,"wires":[]},{"id":"jevex1subject","type":"debug","z":"jevex1tab","name":"subject label","active":true,"complete":"answer","targetType":"msg","x":560,"y":200,"wires":[]}]
 ```
 
 </details>
 
-### Prefilter in front of an LLM
+### Prefilter in front of a larger model
 
 ![LLM prefilter flow](https://raw.githubusercontent.com/ayali/node-red-contrib-jev/main/docs/example-llm-prefilter.png)
 
-Single output. Every inbound message is triaged with three questions at once — whether
-it needs action, what it is about, and how soon — and only the minority that need prose
-reach the expensive model. A Switch node on `msg.answers.needs_action.noul` decides
-which.
+An inbound message is triaged by three questions of different types at once — a yes/no
+for whether it needs action, a choice for what it is about, and a score for how soon.
+All three answers come back together on `msg.answers`, and a Switch node reads one of
+them to decide whether the message is worth passing to a more expensive model.
 
-This is the cascade pattern, and the main reason to reach for a model like this: the
-classification costs a fraction of a cent, so it can run on everything.
+This is the cascade pattern: a cheap, calibrated pass runs on everything, and only the
+minority that need prose reach a model that charges like one. It also shows the value
+of asking several questions in one request — the extra two cost almost nothing, and the
+labels they produce are useful further down the flow.
 
 <details>
 <summary>Flow JSON</summary>
 
 ```json
-[{"id":"jevex2tab","type":"tab","label":"Jev \u2014 LLM prefilter","disabled":false,"info":"Cascade pattern: Jev answers three questions about every inbound message for a fraction of a cent, and only the minority that need prose reach the expensive model.\n\nSingle-output mode \u2014 all three answers arrive together on msg.jev.answers."},{"id":"jevex2cfg","type":"jev-config","name":"TypeSafe","baseUrl":"https://api.typesafe.ai","model":"jev-latest"},{"id":"jevex2inject","type":"inject","z":"jevex2tab","name":"sample message","props":[{"p":"payload"}],"repeat":"","crontab":"","once":false,"topic":"","payload":"Reminder: tomorrow is a short day, pickup at 12:30 instead of 14:00. Please send a note if someone else is collecting.","payloadType":"str","x":160,"y":120,"wires":[["jevex2jev"]]},{"id":"jevex2jev","type":"jev","z":"jevex2tab","name":"triage","server":"jevex2cfg","mode":"single","state":"payload","stateType":"msg","questions":[{"key":"needs_action","type":"noul","instructions":"Does this message require a parent to do something?","trueDesc":"Asks for a reply, a signature, money, an item to bring, or a change to pickup or schedule","falseDesc":"Social chatter, thanks, photos, or information needing no response"},{"key":"category","type":"choice","instructions":"What is this message about?","options":[{"name":"schedule","desc":"Times, dates, pickup, cancellations"},{"name":"logistics","desc":"Items to bring, forms, payments"},{"name":"social","desc":"Chatter, congratulations, photos"},{"name":"urgent","desc":"Safety, illness, or something happening today"}]},{"key":"time_pressure","type":"score","instructions":"How soon must this be acted on?","levels":["Whenever","This week","Today"]}],"timeout":15000,"retries":2,"outputs":1,"x":350,"y":120,"wires":[["jevex2switch"]],"metadataProp":"jev","questionProp":"question","answerProp":"answer","responseProp":"answers"},{"id":"jevex2switch","type":"switch","z":"jevex2tab","name":"act?","property":"answers.needs_action.noul","propertyType":"msg","rules":[{"t":"gte","v":"0.6","vt":"num"},{"t":"else"}],"checkall":"false","outputs":2,"x":510,"y":120,"wires":[["jevex2llm"],["jevex2drop"]]},{"id":"jevex2llm","type":"debug","z":"jevex2tab","name":"\u2192 LLM summariser","active":true,"complete":"true","targetType":"msg","x":710,"y":90,"wires":[]},{"id":"jevex2drop","type":"debug","z":"jevex2tab","name":"\u2192 digest only","active":true,"complete":"true","targetType":"msg","x":700,"y":150,"wires":[]}]
+[{"id":"jevex2tab","type":"tab","label":"Jev \u2014 LLM prefilter","disabled":false,"info":"Triages a message with three questions of different types in a single request.\n\nAll the answers arrive together on msg.answers, and a Switch node reads one of them to decide whether the message is worth passing to a more expensive model."},{"id":"jevex2cfg","type":"jev-config","name":"TypeSafe","baseUrl":"https://api.typesafe.ai","model":"jev-latest"},{"id":"jevex2inject","type":"inject","z":"jevex2tab","name":"sample message","props":[{"p":"payload"}],"repeat":"","crontab":"","once":false,"topic":"","payload":"Reminder: tomorrow is a short day, pickup at 12:30 instead of 14:00. Please send a note if someone else is collecting.","payloadType":"str","x":160,"y":120,"wires":[["jevex2jev"]]},{"id":"jevex2jev","type":"jev","z":"jevex2tab","name":"triage","server":"jevex2cfg","mode":"single","state":"payload","stateType":"msg","questions":[{"key":"needs_action","type":"noul","instructions":"Does this message require a parent to do something?","trueDesc":"Asks for a reply, a signature, money, an item to bring, or a change to pickup or schedule","falseDesc":"Social chatter, thanks, photos, or information needing no response"},{"key":"category","type":"choice","instructions":"What is this message about?","options":[{"name":"schedule","desc":"Times, dates, pickup, cancellations"},{"name":"logistics","desc":"Items to bring, forms, payments"},{"name":"social","desc":"Chatter, congratulations, photos"},{"name":"urgent","desc":"Safety, illness, or something happening today"}]},{"key":"time_pressure","type":"score","instructions":"How soon must this be acted on?","levels":["Whenever","This week","Today"]}],"timeout":15000,"retries":2,"outputs":1,"x":350,"y":120,"wires":[["jevex2switch"]],"metadataProp":"jev","questionProp":"question","answerProp":"answer","responseProp":"answers"},{"id":"jevex2switch","type":"switch","z":"jevex2tab","name":"act?","property":"answers.needs_action.noul","propertyType":"msg","rules":[{"t":"gte","v":"0.6","vt":"num"},{"t":"else"}],"checkall":"false","outputs":2,"x":510,"y":120,"wires":[["jevex2llm"],["jevex2drop"]]},{"id":"jevex2llm","type":"debug","z":"jevex2tab","name":"\u2192 LLM summariser","active":true,"complete":"true","targetType":"msg","x":710,"y":90,"wires":[]},{"id":"jevex2drop","type":"debug","z":"jevex2tab","name":"\u2192 digest only","active":true,"complete":"true","targetType":"msg","x":700,"y":150,"wires":[]}]
 ```
 
 </details>

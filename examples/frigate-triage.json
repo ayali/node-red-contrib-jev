@@ -4,7 +4,7 @@
     "type": "tab",
     "label": "Jev — Frigate triage",
     "disabled": false,
-    "info": "One output per question. Each branch decides its own threshold in a Switch node, so the decision boundary stays visible on the canvas.\n\nSwap the inject node for your `frigate/events` MQTT in node."
+    "info": "Evaluates a camera event with two questions in one request, and gives each answer its own output.\n\nThe yes/no answer feeds a Switch node that splits on a confidence band rather than a single cutoff, so an uncertain answer lands on its own branch instead of being forced either way."
   },
   {
     "id": "jevex1cfg",
