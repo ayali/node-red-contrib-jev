@@ -1,6 +1,6 @@
 {
   "name": "@ayali/node-red-contrib-jev",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Simple Node RED integration to TypeSafe AI's runtime Jev model",
   "license": "MIT",
   "author": "Ayal Itzkovitz",
